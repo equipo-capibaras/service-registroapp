@@ -128,7 +128,7 @@ class TestIncident(ParametrizedTestCase):
             role=Role.ADMIN,
             assigned=True,
         )
-        resp = self.call_web_incident_api(token, {"name": "test"})
+        resp = self.call_web_incident_api(token, {'name': 'test'})
         self.assertEqual(resp.status_code, 400)
         resp_data = json.loads(resp.get_data())
         self.assertEqual(resp_data['code'], 400)
