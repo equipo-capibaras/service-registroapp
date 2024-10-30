@@ -11,7 +11,7 @@ from containers import Container
 from models import Channel, Incident, Role, User
 from repositories import IncidentRepository, UserRepository
 
-from .util import class_route, error_response, json_response, requires_token
+from .util import class_route, error_response, json_response, requires_token, validation_error_response
 
 blp = Blueprint('Incidents', __name__)
 
@@ -33,8 +33,8 @@ def incident_to_dict(incident: Incident) -> dict[str, Any]:
 @dataclass
 class IncidentRegistrationBody:
     email: str = field(metadata={'validate': [marshmallow.validate.Email(), marshmallow.validate.Length(min=1, max=60)]})
-    name: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=90)]})
-    description: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=5000)]})
+    name: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=60)]})
+    description: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=1000)]})
 
 @class_route(blp, '/api/v1/users/me/incidents')
 class UserIncidents(MethodView):
@@ -61,29 +61,32 @@ class UserIncidents(MethodView):
 class WebRegistrationIncident(MethodView):
     init_every_request = False
 
-    def _validate_authorization(self, token: dict[str, Any]) -> None:
+    def _validate_token_info(self, token: dict[str, Any]) -> (str, str):
+        error_message = None
+        error_code = None
+
         if token['role'] not in [Role.ADMIN.value, Role.AGENT.value]:
-            raise PermissionError('Forbidden: You do not have access to this resource.')
-
+            error_message = 'Forbidden: You do not have access to this resource.'
+            error_code = 403
         if token['cid'] is None:
-            raise PermissionError('Unauthorized: You do not belong to any client.')
+            error_message = 'Unauthorized: You do not belong to any client.'
+            error_code = 401
 
-    def _validate_request_body(self, req_json: dict[str, Any]) -> IncidentRegistrationBody:
-        if req_json is None:
-            raise ValueError(JSON_VALIDATION_ERROR)
+        return error_message, error_code
 
-        incident_schema = marshmallow_dataclass.class_schema(IncidentRegistrationBody)()
-        return incident_schema.load(req_json)
+    def _validate_user_info(self, user: User, token: dict[str, Any]) -> (str, str):
+        error_message = None
+        error_code = None
 
-    def _validate_user(self, user_repo: UserRepository, email: str, client_id: str) -> User:
-        user = user_repo.find_by_email(email)
         if user is None:
-            raise ValueError('Invalid value for email: User does not exist.')
+            error_message = 'Invalid value for email: User does not exist.'
+            error_code = 404
 
-        if user.client_id != client_id:
-            raise ValueError('Unauthorized: User does not belong to your client.')
+        elif user.client_id != token['cid']:
+            error_message = 'Unauthorized: User does not belong to your client.'
+            error_code = 401
 
-        return user
+        return error_message, error_code
 
     @requires_token
     def post(
@@ -92,24 +95,32 @@ class WebRegistrationIncident(MethodView):
         incident_repo: IncidentRepository = Provide[Container.incident_repo],
         user_repo: UserRepository = Provide[Container.user_repo],
     ) -> Response:
+        # Validate employee
+        error_message, error_code = self._validate_token_info(token)
+
+        # Return error response if any
+        if error_message and error_code:
+            return error_response(error_message, error_code)
+
+        # Parse request body
+        incident_schema = marshmallow_dataclass.class_schema(IncidentRegistrationBody)()
+        req_json = request.get_json(silent=True)
+        if req_json is None:
+            return error_response(JSON_VALIDATION_ERROR, 400)
+
         try:
-            # Validate authorization
-            self._validate_authorization(token)
+            data: IncidentRegistrationBody = incident_schema.load(req_json)
+        except marshmallow.ValidationError as err:
+            return validation_error_response(err)
 
-            # Parse request body and validate
-            req_json = request.get_json(silent=True)
-            data = self._validate_request_body(req_json)
+        # Get and validate user
+        user = user_repo.find_by_email(data.email)
+        error_message, error_code = self._validate_user_info(user, token)
 
-            # Validate User
-            user = self._validate_user(user_repo, data.email, token['cid'])
+        # Return error response if any
+        if error_message and error_code:
+            return error_response(error_message, error_code)
 
-        except ValueError as err:
-            return error_response(str(err), 400)
-
-        except PermissionError as err:
-            return error_response(str(err), 401)
-
-        # Create incident
         incident = Incident(
             client_id=token['cid'],
             name=data.name,
