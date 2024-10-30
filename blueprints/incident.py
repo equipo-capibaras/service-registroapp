@@ -17,6 +17,7 @@ blp = Blueprint('Incidents', __name__)
 
 JSON_VALIDATION_ERROR = 'Request body must be a JSON object.'
 
+
 def incident_to_dict(incident: Incident) -> dict[str, Any]:
     return {
         'client_id': incident.client_id,
@@ -28,13 +29,13 @@ def incident_to_dict(incident: Incident) -> dict[str, Any]:
     }
 
 
-
 # Incident validation class
 @dataclass
 class IncidentRegistrationBody:
     email: str = field(metadata={'validate': [marshmallow.validate.Email(), marshmallow.validate.Length(min=1, max=60)]})
     name: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=60)]})
     description: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=1000)]})
+
 
 @class_route(blp, '/api/v1/users/me/incidents')
 class UserIncidents(MethodView):
@@ -57,11 +58,12 @@ class UserIncidents(MethodView):
 
         return json_response({'id': '753f5554-c545-447d-8a4d-4eccda9e952a'}, 201)
 
+
 @class_route(blp, '/api/v1/incidents/web')
 class WebRegistrationIncident(MethodView):
     init_every_request = False
 
-    def _validate_token_info(self, token: dict[str, Any]) -> (str, str):
+    def validate_token_info(self, token: dict[str, Any]) -> tuple[str | None, int | None]:
         error_message = None
         error_code = None
 
@@ -74,15 +76,11 @@ class WebRegistrationIncident(MethodView):
 
         return error_message, error_code
 
-    def _validate_user_info(self, user: User, token: dict[str, Any]) -> (str, str):
+    def validate_user_info(self, user: User, token: dict[str, Any]) -> tuple[str | None, int | None]:
         error_message = None
         error_code = None
 
-        if user is None:
-            error_message = 'Invalid value for email: User does not exist.'
-            error_code = 404
-
-        elif user.client_id != token['cid']:
+        if user.client_id != token['cid']:
             error_message = 'Unauthorized: User does not belong to your client.'
             error_code = 401
 
@@ -96,7 +94,7 @@ class WebRegistrationIncident(MethodView):
         user_repo: UserRepository = Provide[Container.user_repo],
     ) -> Response:
         # Validate employee
-        error_message, error_code = self._validate_token_info(token)
+        error_message, error_code = self.validate_token_info(token)
 
         # Return error response if any
         if error_message and error_code:
@@ -115,7 +113,11 @@ class WebRegistrationIncident(MethodView):
 
         # Get and validate user
         user = user_repo.find_by_email(data.email)
-        error_message, error_code = self._validate_user_info(user, token)
+
+        if user is None:
+            return error_response('Invalid value for email: User does not exist.', 404)
+
+        error_message, error_code = self.validate_user_info(user, token)
 
         # Return error response if any
         if error_message and error_code:
@@ -140,5 +142,3 @@ class WebRegistrationIncident(MethodView):
         )
 
         return json_response(incident_to_dict(incident), 201)
-
-

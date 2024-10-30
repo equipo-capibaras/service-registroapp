@@ -46,6 +46,7 @@ def requires_token(f: Callable[..., Response]) -> Callable[..., Response]:
 
     return decorated_function
 
+
 def validation_error_response(err: ValidationError) -> Response:
     if isinstance(err.messages, dict):
         msg = ' '.join([f'Invalid value for {k}: {" ".join(v)}' for k, v in err.messages.items()])
