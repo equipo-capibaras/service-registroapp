@@ -1,18 +1,17 @@
-from dataclasses import field, dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import marshmallow
+import marshmallow_dataclass
 from dependency_injector.wiring import Provide
 from flask import Blueprint, Response, request
 from flask.views import MethodView
-import marshmallow_dataclass
-from marshmallow import ValidationError
 
 from containers import Container
-from models import Channel, Incident, Role
+from models import Channel, Incident, Role, User
 from repositories import IncidentRepository, UserRepository
 
-from .util import class_route, json_response, requires_token, error_response, validation_error_response
+from .util import class_route, error_response, json_response, requires_token
 
 blp = Blueprint('Incidents', __name__)
 
@@ -69,6 +68,23 @@ class WebRegistrationIncident(MethodView):
         if token['cid'] is None:
             raise PermissionError('Unauthorized: You do not belong to any client.')
 
+    def _validate_request_body(self, req_json: dict[str, Any]) -> IncidentRegistrationBody:
+        if req_json is None:
+            raise ValueError(JSON_VALIDATION_ERROR)
+
+        incident_schema = marshmallow_dataclass.class_schema(IncidentRegistrationBody)()
+        return incident_schema.load(req_json)
+
+    def _validate_user(self, user_repo: UserRepository, email: str, client_id: str) -> User:
+        user = user_repo.find_by_email(email)
+        if user is None:
+            raise ValueError('Invalid value for email: User does not exist.')
+
+        if user.client_id != client_id:
+            raise ValueError('Unauthorized: User does not belong to your client.')
+
+        return user
+
     @requires_token
     def post(
         self,
@@ -77,23 +93,15 @@ class WebRegistrationIncident(MethodView):
         user_repo: UserRepository = Provide[Container.user_repo],
     ) -> Response:
         try:
+            # Validate authorization
             self._validate_authorization(token)
 
-            # Parse request body
-            incident_schema = marshmallow_dataclass.class_schema(IncidentRegistrationBody)()
+            # Parse request body and validate
             req_json = request.get_json(silent=True)
-            if req_json is None:
-                raise ValueError(JSON_VALIDATION_ERROR)
-
-            data: IncidentRegistrationBody = incident_schema.load(req_json)
+            data = self._validate_request_body(req_json)
 
             # Validate User
-            user = user_repo.find_by_email(data.email)
-            if user is None:
-                raise ValueError('Invalid value for email: User does not exist.')
-
-            if user.client_id != token['cid']:
-                raise ValueError('Unauthorized: User does not belong to your client.')
+            user = self._validate_user(user_repo, data.email, token['cid'])
 
         except ValueError as err:
             return error_response(str(err), 400)
