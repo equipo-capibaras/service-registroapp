@@ -24,7 +24,7 @@ class RestIncidentRepository(IncidentRepository, RestBaseRepository):
             'assigned_to': incident.assigned_to,
         }
 
-        resp = self.authenticated_post(f'{self.base_url}/api/v1/register/incident', data)
+        resp = self.authenticated_post(f'{self.base_url}/api/v1/register/incident', json=data)
 
         if resp.status_code == requests.codes.created:
             response_data = resp.json()
