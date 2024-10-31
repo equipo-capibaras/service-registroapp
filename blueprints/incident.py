@@ -130,15 +130,16 @@ class WebRegistrationIncident(MethodView):
             reported_by=user.id,
             created_by=token['sub'],
             description=data.description,
+            assigned_to=token['sub'],
         )
 
-        incident_repo.create(
-            client_id=incident.client_id,
-            name=incident.name,
-            channel=incident.channel,
-            reported_by=incident.reported_by,
-            created_by=incident.created_by,
-            description=incident.description,
-        )
+        # incident_repo.create(
+        #     client_id=incident.client_id,
+        #     name=incident.name,
+        #     channel=incident.channel,
+        #     reported_by=incident.reported_by,
+        #     created_by=incident.created_by,
+        #     description=incident.description,
+        # )
 
         return json_response(incident_to_dict(incident), 201)

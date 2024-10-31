@@ -1,14 +1,12 @@
 from dataclasses import dataclass
 
-from models import Channel
-
 
 @dataclass
-class Incident:
+class IncidentResponse:
+    id: str
     client_id: str
     name: str
-    channel: Channel
+    channel: str
     reported_by: str
     created_by: str
-    description: str
     assigned_to: str
