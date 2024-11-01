@@ -4,6 +4,7 @@ from typing import Any, cast
 
 from flask import Blueprint, Request, Response, request
 from flask.views import MethodView
+from marshmallow import ValidationError
 from tightwrap import wraps
 
 
@@ -44,3 +45,11 @@ def requires_token(f: Callable[..., Response]) -> Callable[..., Response]:
         return error_response('Token is missing', 401)
 
     return decorated_function
+
+
+def validation_error_response(err: ValidationError) -> Response:
+    if isinstance(err.messages, dict):
+        msg = ' '.join([f'Invalid value for {k}: {" ".join(v)}' for k, v in err.messages.items()])
+        return error_response(msg, 400)
+
+    raise NotImplementedError('Validation error response for non-dict messages not implemented.')  # pragma: no cover
