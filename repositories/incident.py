@@ -1,5 +1,3 @@
-
-
 from models import Incident, IncidentResponse
 
 

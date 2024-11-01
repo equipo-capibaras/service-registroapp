@@ -1,4 +1,3 @@
-
 from .incident import IncidentRepository
 from .user import UserRepository
 

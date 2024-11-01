@@ -8,7 +8,7 @@ from flask import Blueprint, Response, request
 from flask.views import MethodView
 
 from containers import Container
-from models import Channel, Incident, Role, User, IncidentResponse
+from models import Channel, Incident, IncidentResponse, Role, User
 from repositories import IncidentRepository, UserRepository
 
 from .util import class_route, error_response, json_response, requires_token, validation_error_response
@@ -57,9 +57,7 @@ class UserIncidents(MethodView):
             description='This is a test incident',
             assigned_to=token['sub'],
         )
-        incident_repo.create(
-            incident
-        )
+        incident_repo.create(incident)
 
         return json_response({'id': '753f5554-c545-447d-8a4d-4eccda9e952a'}, 201)
 
@@ -81,15 +79,18 @@ class WebRegistrationIncident(MethodView):
 
         return error_message, error_code
 
-    def validate_user_info(self, user: User, token: dict[str, Any]) -> tuple[str | None, int | None]:
+    def validate_user_info(self, user: User | None, token: dict[str, Any]) -> tuple[str | None, int | None]:
         error_message = None
         error_code = None
 
-        if user.client_id != token['cid']:
+        if user.client_id != token['cid']:  # Aquí
             error_message = 'Unauthorized: User does not belong to your client.'
             error_code = 401
 
         return error_message, error_code
+
+    def deliver_error_response(self, error_message: str, error_code: int) -> Response:
+        return error_response(error_message, error_code)
 
     @requires_token
     def post(
@@ -103,16 +104,16 @@ class WebRegistrationIncident(MethodView):
 
         # Return error response if any
         if error_message and error_code:
-            return error_response(error_message, error_code)
+            self.deliver_error_response(error_message, error_code)
 
         # Parse request body
         incident_schema = marshmallow_dataclass.class_schema(IncidentRegistrationBody)()
         req_json = request.get_json(silent=True)
         if req_json is None:
-            return error_response(JSON_VALIDATION_ERROR, 400)
+            self.deliver_error_response(JSON_VALIDATION_ERROR, 400)
 
         try:
-            data: IncidentRegistrationBody = incident_schema.load(req_json)
+            data: IncidentRegistrationBody = incident_schema.load(req_json)  # Aquí
         except marshmallow.ValidationError as err:
             return validation_error_response(err)
 
@@ -120,19 +121,19 @@ class WebRegistrationIncident(MethodView):
         user = user_repo.find_by_email(data.email)
 
         if user is None:
-            return error_response('Invalid value for email: User does not exist.', 404)
+            self.deliver_error_response('Invalid value for email: User does not exist.', 404)
 
         error_message, error_code = self.validate_user_info(user, token)
 
         # Return error response if any
         if error_message and error_code:
-            return error_response(error_message, error_code)
+            self.deliver_error_response(error_message, error_code)
 
         incident = Incident(
             client_id=token['cid'],
             name=data.name,
             channel=Channel.WEB,
-            reported_by=user.id,
+            reported_by=user.id,  # Aquí
             created_by=token['sub'],
             description=data.description,
             assigned_to=token['sub'],
@@ -141,6 +142,6 @@ class WebRegistrationIncident(MethodView):
         incident_response = incident_repo.create(incident)
 
         if incident_response is None:
-            return error_response('An error occurred while creating the incident.', 500)
+            self.deliver_error_response('An error occurred while creating the incident.', 500)
 
-        return json_response(incident_to_dict(incident_response), 201)
+        return json_response(incident_to_dict(incident_response), 201)  # Aquí

@@ -8,7 +8,7 @@ from unittest_parametrize import ParametrizedTestCase, parametrize
 from werkzeug.test import TestResponse
 
 from app import create_app
-from models import Channel, Role, User, IncidentResponse
+from models import Channel, IncidentResponse, Role, User
 from repositories import IncidentRepository, UserRepository
 
 from .util import gen_token
@@ -235,4 +235,3 @@ class TestIncident(ParametrizedTestCase):
         self.assertEqual(resp_data['channel'], Channel.WEB.value)
         self.assertEqual(resp_data['reported_by'], user.id)
         self.assertEqual(resp_data['created_by'], token['sub'])
-

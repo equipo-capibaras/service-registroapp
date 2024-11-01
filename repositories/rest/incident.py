@@ -1,5 +1,3 @@
-from typing import Any
-
 import requests
 
 from models import Incident, IncidentResponse
@@ -39,5 +37,3 @@ class RestIncidentRepository(IncidentRepository, RestBaseRepository):
             )
 
         return None
-
-
