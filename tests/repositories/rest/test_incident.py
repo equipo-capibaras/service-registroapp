@@ -32,7 +32,7 @@ class TestIncident(ParametrizedTestCase):
             'id': str(self.faker.uuid4()),
             'client_id': incident.client_id,
             'name': incident.name,
-            'channel': incident.channel,
+            'channel': incident.channel.value,
             'reported_by': incident.reported_by,
             'created_by': incident.created_by,
             'assigned_to': incident.assigned_to,
@@ -47,15 +47,19 @@ class TestIncident(ParametrizedTestCase):
 
             result = self.repo.create(incident)
 
+            # Verificar que el resultado no sea None
+            self.assertIsNotNone(result)
+
             # Verificar que el resultado sea una instancia de IncidentResponse
-            self.assertIsInstance(result, IncidentResponse)
-            self.assertEqual(result.id, response_data['id'])  # Aquí
-            self.assertEqual(result.client_id, response_data['client_id'])  # Aquí
-            self.assertEqual(result.name, response_data['name'])  # Aquí
-            self.assertEqual(result.channel, response_data['channel'])  # Aquí
-            self.assertEqual(result.reported_by, response_data['reported_by'])  # Aquí
-            self.assertEqual(result.created_by, response_data['created_by'])  # Aquí
-            self.assertEqual(result.assigned_to, response_data['assigned_to'])  # Aquí
+            if result is not None:  # Necesario para que mypy no marque error
+                self.assertIsInstance(result, IncidentResponse)
+                self.assertEqual(result.id, response_data['id'])
+                self.assertEqual(result.client_id, response_data['client_id'])
+                self.assertEqual(result.name, response_data['name'])
+                self.assertEqual(result.channel, response_data['channel'])
+                self.assertEqual(result.reported_by, response_data['reported_by'])
+                self.assertEqual(result.created_by, response_data['created_by'])
+                self.assertEqual(result.assigned_to, response_data['assigned_to'])
 
             # Verificar que la solicitud se envió correctamente
             body = cast(str | bytes, rsps.calls[0].request.body)
@@ -65,7 +69,7 @@ class TestIncident(ParametrizedTestCase):
                 {
                     'client_id': incident.client_id,
                     'name': incident.name,
-                    'channel': incident.channel,
+                    'channel': incident.channel.value,
                     'reported_by': incident.reported_by,
                     'created_by': incident.created_by,
                     'description': incident.description,

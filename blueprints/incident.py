@@ -89,6 +89,7 @@ class WebRegistrationIncident(MethodView):
 
         return error_message, error_code
 
+
     @requires_token
     def post(
         self,
@@ -139,6 +140,8 @@ class WebRegistrationIncident(MethodView):
         incident_response = incident_repo.create(incident)
 
         if incident_response is None:
-            return error_response('An error occurred while creating the incident.', 500)
+            posible_response = error_response('An error occurred while creating the incident.', 500)
+        else:
+            posible_response = json_response(incident_to_dict(incident_response), 201)
 
-        return json_response(incident_to_dict(incident_response), 201)
+        return posible_response
