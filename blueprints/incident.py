@@ -89,7 +89,6 @@ class WebRegistrationIncident(MethodView):
 
         return error_message, error_code
 
-
     @requires_token
     def post(
         self,
