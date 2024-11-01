@@ -8,7 +8,7 @@ from flask import Blueprint, Response, request
 from flask.views import MethodView
 
 from containers import Container
-from models import Channel, Incident, Role, User
+from models import Channel, Incident, Role, User, IncidentResponse
 from repositories import IncidentRepository, UserRepository
 
 from .util import class_route, error_response, json_response, requires_token, validation_error_response
@@ -18,14 +18,15 @@ blp = Blueprint('Incidents', __name__)
 JSON_VALIDATION_ERROR = 'Request body must be a JSON object.'
 
 
-def incident_to_dict(incident: Incident) -> dict[str, Any]:
+def incident_to_dict(incident: IncidentResponse) -> dict[str, Any]:
     return {
+        'id': incident.id,
         'client_id': incident.client_id,
         'name': incident.name,
-        'channel': incident.channel.value,
+        'channel': incident.channel,
         'reported_by': incident.reported_by,
         'created_by': incident.created_by,
-        'description': incident.description,
+        'assigned_to': incident.assigned_to,
     }
 
 
@@ -47,13 +48,17 @@ class UserIncidents(MethodView):
         token: dict[str, Any],
         incident_repo: IncidentRepository = Provide[Container.incident_repo],
     ) -> Response:
-        incident_repo.create(
+        incident = Incident(
             client_id=token['cid'],
             name='Test Incident',
             channel=Channel.MOBILE,
             reported_by=token['sub'],
             created_by=token['sub'],
             description='This is a test incident',
+            assigned_to=token['sub'],
+        )
+        incident_repo.create(
+            incident
         )
 
         return json_response({'id': '753f5554-c545-447d-8a4d-4eccda9e952a'}, 201)
@@ -133,13 +138,9 @@ class WebRegistrationIncident(MethodView):
             assigned_to=token['sub'],
         )
 
-        # incident_repo.create(
-        #     client_id=incident.client_id,
-        #     name=incident.name,
-        #     channel=incident.channel,
-        #     reported_by=incident.reported_by,
-        #     created_by=incident.created_by,
-        #     description=incident.description,
-        # )
+        incident_response = incident_repo.create(incident)
 
-        return json_response(incident_to_dict(incident), 201)
+        if incident_response is None:
+            return error_response('An error occurred while creating the incident.', 500)
+
+        return json_response(incident_to_dict(incident_response), 201)

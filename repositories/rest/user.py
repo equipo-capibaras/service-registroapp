@@ -38,7 +38,7 @@ class RestUserRepository(UserRepository, RestBaseRepository):
             json['client_id'] = json.pop('clientId')
             return dacite.from_dict(data_class=User, data=json)
 
-        if resp.status_code == requests.codes.not_found:
+        else:
             return None
 
-        self.unexpected_error(resp)  # noqa: RET503
+
