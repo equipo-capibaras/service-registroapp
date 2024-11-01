@@ -79,18 +79,15 @@ class WebRegistrationIncident(MethodView):
 
         return error_message, error_code
 
-    def validate_user_info(self, user: User | None, token: dict[str, Any]) -> tuple[str | None, int | None]:
+    def validate_user_info(self, user: User, token: dict[str, Any]) -> tuple[str | None, int | None]:
         error_message = None
         error_code = None
 
-        if user.client_id != token['cid']:  # Aquí
+        if user.client_id != token['cid']:
             error_message = 'Unauthorized: User does not belong to your client.'
             error_code = 401
 
         return error_message, error_code
-
-    def deliver_error_response(self, error_message: str, error_code: int) -> Response:
-        return error_response(error_message, error_code)
 
     @requires_token
     def post(
@@ -104,16 +101,16 @@ class WebRegistrationIncident(MethodView):
 
         # Return error response if any
         if error_message and error_code:
-            self.deliver_error_response(error_message, error_code)
+            return error_response(error_message, error_code)
 
         # Parse request body
         incident_schema = marshmallow_dataclass.class_schema(IncidentRegistrationBody)()
         req_json = request.get_json(silent=True)
         if req_json is None:
-            self.deliver_error_response(JSON_VALIDATION_ERROR, 400)
+            return error_response(JSON_VALIDATION_ERROR, 400)
 
         try:
-            data: IncidentRegistrationBody = incident_schema.load(req_json)  # Aquí
+            data: IncidentRegistrationBody = incident_schema.load(req_json)
         except marshmallow.ValidationError as err:
             return validation_error_response(err)
 
@@ -121,19 +118,19 @@ class WebRegistrationIncident(MethodView):
         user = user_repo.find_by_email(data.email)
 
         if user is None:
-            self.deliver_error_response('Invalid value for email: User does not exist.', 404)
+            return error_response('Invalid value for email: User does not exist.', 404)
 
         error_message, error_code = self.validate_user_info(user, token)
 
         # Return error response if any
         if error_message and error_code:
-            self.deliver_error_response(error_message, error_code)
+            return error_response(error_message, error_code)
 
         incident = Incident(
             client_id=token['cid'],
             name=data.name,
             channel=Channel.WEB,
-            reported_by=user.id,  # Aquí
+            reported_by=user.id,
             created_by=token['sub'],
             description=data.description,
             assigned_to=token['sub'],
@@ -142,6 +139,6 @@ class WebRegistrationIncident(MethodView):
         incident_response = incident_repo.create(incident)
 
         if incident_response is None:
-            self.deliver_error_response('An error occurred while creating the incident.', 500)
+            return error_response('An error occurred while creating the incident.', 500)
 
-        return json_response(incident_to_dict(incident_response), 201)  # Aquí
+        return json_response(incident_to_dict(incident_response), 201)
