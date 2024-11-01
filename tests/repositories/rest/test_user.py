@@ -144,8 +144,7 @@ class TestUser(ParametrizedTestCase):
             user_repo = self.repo.find_by_email(email)
             self.assertIsNone(user_repo)
 
-
-def test_find_by_email_with_token_provider(self) -> None:
+    def test_find_by_email_with_token_provider(self) -> None:
         token = self.faker.pystr()
         token_provider = Mock(TokenProvider)
         cast(Mock, token_provider.get_token).return_value = token

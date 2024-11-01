@@ -38,7 +38,4 @@ class RestUserRepository(UserRepository, RestBaseRepository):
             json['client_id'] = json.pop('clientId')
             return dacite.from_dict(data_class=User, data=json)
 
-        else:
-            return None
-
-
+        return None
