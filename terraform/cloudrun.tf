@@ -49,7 +49,7 @@ resource "google_cloud_run_v2_service" "default" {
 
       env {
         name = "CLIENT_SVC_URL"
-        value = "https://incidentmodify-${data.google_project.default.number}.${local.region}.run.app"
+        value = "https://client-${data.google_project.default.number}.${local.region}.run.app"
       }
 
       startup_probe {
