@@ -145,12 +145,7 @@ class WebRegistrationIncident(MethodView):
 
         incident_response = incident_repo.create(incident)
 
-        if incident_response is None:
-            posible_response = error_response('An error occurred while creating the incident.', 500)
-        else:
-            posible_response = json_response(incident_to_dict(incident_response), 201)
-
-        return posible_response
+        return json_response(incident_to_dict(incident_response), 201)
 
 
 @class_route(blp, '/api/v1/incidents/mobile')
@@ -197,9 +192,4 @@ class MobileRegistrationIncident(MethodView):
 
         incident_response = incident_repo.create(incident)
 
-        if incident_response is None:
-            posible_response = error_response('An error occurred while creating the incident.', 500)
-        else:
-            posible_response = json_response(incident_to_dict(incident_response), 201)
-
-        return posible_response
+        return json_response(incident_to_dict(incident_response), 201)

@@ -11,7 +11,7 @@ class RestIncidentRepository(IncidentRepository, RestBaseRepository):
     def __init__(self, base_url: str, token_provider: TokenProvider | None) -> None:
         RestBaseRepository.__init__(self, base_url, token_provider)
 
-    def create(self, incident: Incident) -> IncidentResponse | None:
+    def create(self, incident: Incident) -> IncidentResponse:
         data = {
             'client_id': incident.client_id,
             'name': incident.name,
@@ -36,4 +36,4 @@ class RestIncidentRepository(IncidentRepository, RestBaseRepository):
                 assigned_to=response_data['assigned_to'],
             )
 
-        return None
+        self.unexpected_error(resp)  # noqa: RET503
