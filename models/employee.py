@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from models import Role
+from models.role import Role
 
 
 @dataclass
