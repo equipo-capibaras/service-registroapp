@@ -1,7 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
-
-from models.role import Role
 
 
 @dataclass
@@ -10,6 +7,6 @@ class Employee:
     client_id: str
     name: str
     email: str
-    role: Role
+    role: str
     invitation_status: str
-    invitation_date: datetime
+    invitation_date: str

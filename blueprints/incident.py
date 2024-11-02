@@ -144,3 +144,8 @@ class WebRegistrationIncident(MethodView):
             posible_response = json_response(incident_to_dict(incident_response), 201)
 
         return posible_response
+
+
+@class_route(blp, '/api/v1/incidents/mobile')
+class MobileRegistrationIncident(MethodView):
+    init_every_request = False

@@ -20,8 +20,8 @@ class RestEmployeeRepository(EmployeeRepository, RestBaseRepository):
         if resp.status_code == requests.codes.ok:
             json = cast(dict[str, Any], resp.json())
             json['client_id'] = json.pop('clientId')
-            json['invitationStatus'] = json.pop('invitation_status')
-            json['invitationDate'] = json.pop('invitation_date')
+            json['invitation_status'] = json.pop('invitationStatus')
+            json['invitation_date'] = json.pop('invitationDate')
             return dacite.from_dict(data_class=Employee, data=json)
 
         if resp.status_code == requests.codes.not_found:
