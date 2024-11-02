@@ -9,7 +9,7 @@ from flask.views import MethodView
 
 from containers import Container
 from models import Channel, Incident, IncidentResponse, Role, User
-from repositories import IncidentRepository, UserRepository
+from repositories import EmployeeRepository, IncidentRepository, UserRepository
 
 from .util import class_route, error_response, json_response, requires_token, validation_error_response
 
@@ -34,6 +34,13 @@ def incident_to_dict(incident: IncidentResponse) -> dict[str, Any]:
 @dataclass
 class IncidentRegistrationBody:
     email: str = field(metadata={'validate': [marshmallow.validate.Email(), marshmallow.validate.Length(min=1, max=60)]})
+    name: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=60)]})
+    description: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=1000)]})
+
+
+# Incident validation class for mobile
+@dataclass
+class IncidentMobileRegistrationBody:
     name: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=60)]})
     description: str = field(metadata={'validate': [marshmallow.validate.Length(min=1, max=1000)]})
 
@@ -138,9 +145,51 @@ class WebRegistrationIncident(MethodView):
 
         incident_response = incident_repo.create(incident)
 
-        if incident_response is None:
-            posible_response = error_response('An error occurred while creating the incident.', 500)
-        else:
-            posible_response = json_response(incident_to_dict(incident_response), 201)
+        return json_response(incident_to_dict(incident_response), 201)
 
-        return posible_response
+
+@class_route(blp, '/api/v1/incidents/mobile')
+class MobileRegistrationIncident(MethodView):
+    init_every_request = False
+
+    @requires_token
+    def post(
+        self,
+        token: dict[str, Any],
+        incident_repo: IncidentRepository = Provide[Container.incident_repo],
+        employee_repo: EmployeeRepository = Provide[Container.employee_repo],
+    ) -> Response:
+        # Validate user
+        if token['role'] != Role.USER.value:
+            return error_response('Forbidden: You do not have access to this resource.', 403)
+
+        # Parse request body
+        incident_schema = marshmallow_dataclass.class_schema(IncidentMobileRegistrationBody)()
+        req_json = request.get_json(silent=True)
+        if req_json is None:
+            return error_response(JSON_VALIDATION_ERROR, 400)
+
+        try:
+            data: IncidentMobileRegistrationBody = incident_schema.load(req_json)
+        except marshmallow.ValidationError as err:
+            return validation_error_response(err)
+
+        # Get an assignee
+        assignee = employee_repo.get_random_agent(token['cid'])
+
+        if assignee is None:
+            return error_response('No agents available to assign the incident.', 404)
+
+        incident = Incident(
+            client_id=token['cid'],
+            name=data.name,
+            channel=Channel.MOBILE,
+            reported_by=token['sub'],
+            created_by=token['sub'],
+            description=data.description,
+            assigned_to=assignee.id,
+        )
+
+        incident_response = incident_repo.create(incident)
+
+        return json_response(incident_to_dict(incident_response), 201)

@@ -3,7 +3,8 @@ from typing import cast
 
 import responses
 from faker import Faker
-from unittest_parametrize import ParametrizedTestCase
+from requests import HTTPError
+from unittest_parametrize import ParametrizedTestCase, parametrize
 
 from models import Channel, Incident, IncidentResponse
 from repositories.rest import RestIncidentRepository
@@ -77,16 +78,21 @@ class TestIncident(ParametrizedTestCase):
                 },
             )
 
-    def test_create_unexpected_error(self) -> None:
+    @parametrize(
+        'status',
+        [
+            (500,),
+            (200,),
+        ],
+    )
+    def test_create_unexpected_error(self, status: int) -> None:
         incident = self.gen_random_incident()
 
         with responses.RequestsMock() as rsps:
             rsps.post(
                 f'{self.base_url}/api/v1/register/incident',
-                status=500,
+                status=status,
             )
 
-            result = self.repo.create(incident)
-
-            # Verificar que el resultado sea None en caso de error
-            self.assertIsNone(result)
+            with self.assertRaises(HTTPError):
+                self.repo.create(incident)

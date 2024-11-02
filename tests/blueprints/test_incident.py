@@ -8,8 +8,8 @@ from unittest_parametrize import ParametrizedTestCase, parametrize
 from werkzeug.test import TestResponse
 
 from app import create_app
-from models import Channel, IncidentResponse, Role, User
-from repositories import IncidentRepository, UserRepository
+from models import Channel, Employee, IncidentResponse, Role, User
+from repositories import EmployeeRepository, IncidentRepository, UserRepository
 
 from .util import gen_token
 
@@ -17,6 +17,7 @@ from .util import gen_token
 class TestIncident(ParametrizedTestCase):
     INCIDENT_API_USER_URL = '/api/v1/users/me/incidents'
     INCIDENT_API_WEB_URL = '/api/v1/incidents/web'
+    INCIDENT_API_MOBILE_URL = '/api/v1/incidents/mobile'
 
     def setUp(self) -> None:
         self.faker = Faker()
@@ -37,6 +38,14 @@ class TestIncident(ParametrizedTestCase):
             headers['X-Apigateway-Api-Userinfo'] = token_encoded
 
         return self.client.post(self.INCIDENT_API_WEB_URL, headers=headers, json=body)
+
+    def call_mobile_incident_api(self, token: dict[str, str] | None, body: dict[str, Any] | None) -> TestResponse:
+        headers = {}
+        if token:
+            token_encoded = base64.urlsafe_b64encode(json.dumps(token).encode()).decode()
+            headers['X-Apigateway-Api-Userinfo'] = token_encoded
+
+        return self.client.post(self.INCIDENT_API_MOBILE_URL, headers=headers, json=body)
 
     def test_user_incidents_no_token(self) -> None:
         resp = self.call_incident_api_user(None)
@@ -235,3 +244,116 @@ class TestIncident(ParametrizedTestCase):
         self.assertEqual(resp_data['channel'], Channel.WEB.value)
         self.assertEqual(resp_data['reported_by'], user.id)
         self.assertEqual(resp_data['created_by'], token['sub'])
+
+    def test_mobile_incident_no_token(self) -> None:
+        resp = self.call_mobile_incident_api(None, None)
+        self.assertEqual(resp.status_code, 401)
+        resp_data = json.loads(resp.get_data())
+        self.assertEqual(resp_data, {'code': 401, 'message': 'Token is missing'})
+
+    @parametrize(
+        'role',
+        [
+            (Role.ADMIN,),
+            (Role.ANALYST,),
+            (Role.AGENT,),
+        ],
+    )
+    def test_mobile_incident_invalid_role(self, role: Role) -> None:
+        token = gen_token(
+            user_id=cast(str, self.faker.uuid4()),
+            client_id=cast(str, self.faker.uuid4()),
+            role=role,
+            assigned=True,
+        )
+        resp = self.call_mobile_incident_api(token, {})
+        self.assertEqual(resp.status_code, 403)
+        resp_data = json.loads(resp.get_data())
+        self.assertEqual(resp_data, {'code': 403, 'message': 'Forbidden: You do not have access to this resource.'})
+
+    def test_mobile_incident_invalid_body(self) -> None:
+        token = gen_token(
+            user_id=cast(str, self.faker.uuid4()),
+            client_id=cast(str, self.faker.uuid4()),
+            role=Role.USER,
+            assigned=True,
+        )
+        resp = self.call_mobile_incident_api(token, {'name': 'test'})
+        self.assertEqual(resp.status_code, 400)
+        resp_data = json.loads(resp.get_data())
+        self.assertEqual(resp_data['code'], 400)
+
+    def test_mobile_incident_no_agent_available(self) -> None:
+        token = gen_token(
+            user_id=cast(str, self.faker.uuid4()),
+            client_id=cast(str, self.faker.uuid4()),
+            role=Role.USER,
+            assigned=True,
+        )
+        body = {
+            'name': self.faker.word(),
+            'description': self.faker.sentence(),
+        }
+
+        employee_repo_mock = Mock(EmployeeRepository)
+        cast(Mock, employee_repo_mock.get_random_agent).return_value = None
+
+        with self.app.container.employee_repo.override(employee_repo_mock):
+            resp = self.call_mobile_incident_api(token, body)
+
+        self.assertEqual(resp.status_code, 404)
+        resp_data = json.loads(resp.get_data())
+        self.assertEqual(resp_data['code'], 404)
+        self.assertEqual(resp_data['message'], 'No agents available to assign the incident.')
+
+    def test_mobile_incident_success(self) -> None:
+        token = gen_token(
+            user_id=cast(str, self.faker.uuid4()),
+            client_id=cast(str, self.faker.uuid4()),
+            role=Role.USER,
+            assigned=True,
+        )
+        body = {
+            'name': self.faker.word(),
+            'description': self.faker.sentence(),
+        }
+
+        employee = Employee(
+            id=cast(str, self.faker.uuid4()),
+            client_id=token['cid'],
+            name=self.faker.name(),
+            email=self.faker.email(),
+            role=Role.AGENT,
+            invitation_status='accepted',
+            invitation_date=self.faker.past_datetime(),
+        )
+
+        incident_response = IncidentResponse(
+            id=cast(str, self.faker.uuid4()),
+            client_id=token['cid'],
+            name=body['name'],
+            channel=Channel.MOBILE,
+            reported_by=token['sub'],
+            created_by=token['sub'],
+            assigned_to=employee.id,
+        )
+
+        employee_repo_mock = Mock(EmployeeRepository)
+        incident_repo_mock = Mock(IncidentRepository)
+
+        cast(Mock, employee_repo_mock.get_random_agent).return_value = employee
+        cast(Mock, incident_repo_mock.create).return_value = incident_response
+
+        with (
+            self.app.container.employee_repo.override(employee_repo_mock),
+            self.app.container.incident_repo.override(incident_repo_mock),
+        ):
+            resp = self.call_mobile_incident_api(token, body)
+
+        self.assertEqual(resp.status_code, 201)
+        resp_data = json.loads(resp.get_data())
+        self.assertEqual(resp_data['name'], body['name'])
+        self.assertEqual(resp_data['channel'], Channel.MOBILE.value)
+        self.assertEqual(resp_data['reported_by'], token['sub'])
+        self.assertEqual(resp_data['created_by'], token['sub'])
+        self.assertEqual(resp_data['assigned_to'], employee.id)
