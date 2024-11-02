@@ -1,6 +1,7 @@
 import responses
 from faker import Faker
-from unittest_parametrize import ParametrizedTestCase
+from requests import HTTPError
+from unittest_parametrize import ParametrizedTestCase, parametrize
 
 from models import Employee
 from repositories.rest import RestEmployeeRepository
@@ -60,3 +61,22 @@ class TestEmployee(ParametrizedTestCase):
 
             # Verificar que el resultado sea None en caso de no encontrar un agente
             self.assertIsNone(result)
+
+    @parametrize(
+        'status',
+        [
+            (500,),
+            (201,),
+        ],
+    )
+    def test_create_unexpected_error(self, status: int) -> None:
+        client_id = str(self.faker.uuid4())
+
+        with responses.RequestsMock() as rsps:
+            rsps.get(
+                f'{self.base_url}/api/v1/random/{client_id}/agent',
+                status=status,
+            )
+
+            with self.assertRaises(HTTPError):
+                self.repo.get_random_agent(client_id)
