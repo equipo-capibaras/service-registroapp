@@ -45,7 +45,7 @@ class TestEmployee(ParametrizedTestCase):
                 self.assertEqual(result.email, response_data['email'])
                 self.assertEqual(result.role, response_data['role'])
                 self.assertEqual(result.invitation_status, response_data['invitationStatus'])
-                self.assertEqual(result.invitation_date, response_data['invitationDate'])
+                self.assertEqual(result.invitation_date.isoformat(), response_data['invitationDate'])
 
     def test_get_random_agent_not_found(self) -> None:
         client_id = str(self.faker.uuid4())

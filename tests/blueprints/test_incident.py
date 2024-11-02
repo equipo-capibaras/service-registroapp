@@ -323,16 +323,16 @@ class TestIncident(ParametrizedTestCase):
             client_id=token['cid'],
             name=self.faker.name(),
             email=self.faker.email(),
-            role=Role.AGENT.value,
+            role=Role.AGENT,
             invitation_status='accepted',
-            invitation_date=self.faker.date_time().isoformat(),
+            invitation_date=self.faker.past_datetime(),
         )
 
         incident_response = IncidentResponse(
             id=cast(str, self.faker.uuid4()),
             client_id=token['cid'],
             name=body['name'],
-            channel=Channel.MOBILE.value,
+            channel=Channel.MOBILE,
             reported_by=token['sub'],
             created_by=token['sub'],
             assigned_to=employee.id,
