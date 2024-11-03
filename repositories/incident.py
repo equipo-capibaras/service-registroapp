@@ -1,3 +1,6 @@
+from models import Incident, IncidentResponse
+
+
 class IncidentRepository:
-    def create(self, *, client_id: str, name: str, channel: str, reported_by: str, created_by: str, description: str) -> None:  # noqa: PLR0913
+    def create(self, incident: Incident) -> IncidentResponse:
         raise NotImplementedError  # pragma: no cover

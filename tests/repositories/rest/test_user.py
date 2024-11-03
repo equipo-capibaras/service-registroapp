@@ -86,3 +86,84 @@ class TestUser(ParametrizedTestCase):
 
             with self.assertRaises(HTTPError):
                 self.repo.get(user_id, client_id)
+
+    def test_find_by_email_success(self) -> None:
+        user = User(
+            id=cast(str, self.faker.uuid4()),
+            client_id=cast(str, self.faker.uuid4()),
+            name=self.faker.name(),
+            email=self.faker.email(),
+        )
+
+        with responses.RequestsMock() as rsps:
+            rsps.post(
+                f'{self.base_url}/api/v1/users/detail',
+                json={
+                    'id': user.id,
+                    'clientId': user.client_id,
+                    'name': user.name,
+                    'email': user.email,
+                },
+                status=200,
+            )
+
+            user_repo = self.repo.find_by_email(user.email)
+
+        self.assertEqual(user_repo, user)
+
+    def test_find_by_email_not_found(self) -> None:
+        email = self.faker.email()
+
+        with responses.RequestsMock() as rsps:
+            rsps.post(
+                f'{self.base_url}/api/v1/users/detail',
+                json={
+                    'message': 'User not found',
+                    'code': 404,
+                },
+                status=404,
+            )
+
+            user_repo = self.repo.find_by_email(email)
+
+        self.assertIsNone(user_repo)
+
+    @parametrize(
+        'status',
+        [
+            (500,),  # Internal Server Error
+            (400,),  # Bad Request (unexpected)
+        ],
+    )
+    def test_find_by_email_error(self, status: int) -> None:
+        email = self.faker.email()
+
+        with responses.RequestsMock() as rsps:
+            rsps.post(f'{self.base_url}/api/v1/users/detail', status=status)
+
+            user_repo = self.repo.find_by_email(email)
+            self.assertIsNone(user_repo)
+
+    def test_find_by_email_with_token_provider(self) -> None:
+        token = self.faker.pystr()
+        token_provider = Mock(TokenProvider)
+        cast(Mock, token_provider.get_token).return_value = token
+
+        repo = RestUserRepository(self.base_url, token_provider)
+
+        email = self.faker.email()
+
+        with responses.RequestsMock() as rsps:
+            rsps.post(
+                f'{self.base_url}/api/v1/users/detail',
+                json={
+                    'id': cast(str, self.faker.uuid4()),
+                    'clientId': cast(str, self.faker.uuid4()),
+                    'name': self.faker.name(),
+                    'email': email,
+                },
+                status=200,
+            )
+
+            repo.find_by_email(email)
+            self.assertEqual(rsps.calls[0].request.headers['Authorization'], f'Bearer {token}')

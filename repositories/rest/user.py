@@ -27,3 +27,15 @@ class RestUserRepository(UserRepository, RestBaseRepository):
             return None
 
         self.unexpected_error(resp)  # noqa: RET503
+
+    def find_by_email(self, email: str) -> User | None:
+        data = {'email': email}
+        resp = self.authenticated_post(f'{self.base_url}/api/v1/users/detail', json=data)
+
+        if resp.status_code == requests.codes.ok:
+            json = cast(dict[str, Any], resp.json())
+            # Convert from json naming convention to Python naming convention
+            json['client_id'] = json.pop('clientId')
+            return dacite.from_dict(data_class=User, data=json)
+
+        return None
