@@ -191,10 +191,10 @@ class TestIncident(ParametrizedTestCase):
         with self.app.container.user_repo.override(user_repo_mock):
             resp = self.call_web_incident_api(token, body)
 
-        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.status_code, 404)
         resp_data = json.loads(resp.get_data())
-        self.assertEqual(resp_data['code'], 401)
-        self.assertEqual(resp_data['message'], 'Unauthorized: User does not belong to your client.')
+        self.assertEqual(resp_data['code'], 404)
+        self.assertEqual(resp_data['message'], 'Invalid value for email: User does not exist.')
 
     def test_web_incident_success(self) -> None:
         token = gen_token(

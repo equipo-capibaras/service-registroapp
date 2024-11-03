@@ -8,7 +8,7 @@ from flask import Blueprint, Response, request
 from flask.views import MethodView
 
 from containers import Container
-from models import Channel, Incident, IncidentResponse, Role, User
+from models import Channel, Incident, IncidentResponse, Role
 from repositories import EmployeeRepository, IncidentRepository, UserRepository
 
 from .util import class_route, error_response, json_response, requires_token, validation_error_response
@@ -86,16 +86,6 @@ class WebRegistrationIncident(MethodView):
 
         return error_message, error_code
 
-    def validate_user_info(self, user: User, token: dict[str, Any]) -> tuple[str | None, int | None]:
-        error_message = None
-        error_code = None
-
-        if user.client_id != token['cid']:
-            error_message = 'Unauthorized: User does not belong to your client.'
-            error_code = 401
-
-        return error_message, error_code
-
     @requires_token
     def post(
         self,
@@ -124,10 +114,8 @@ class WebRegistrationIncident(MethodView):
         # Get and validate user
         user = user_repo.find_by_email(data.email)
 
-        if user is None:
+        if user is None or user.client_id != token['cid']:
             return error_response('Invalid value for email: User does not exist.', 404)
-
-        error_message, error_code = self.validate_user_info(user, token)
 
         # Return error response if any
         if error_message and error_code:
